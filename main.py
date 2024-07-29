@@ -74,5 +74,34 @@ print(train.dtypes)
 
 # KNN
 from sklearn.impute import KNNImputer
+from sklearn.model_selection import cross_val_score
+from sklearn.ensemble import RandomForestRegressor
 
+neighbors_settings = range(3, 10)
+
+# using cross validation to decide the number of n_neighbor
+best_score = float('-inf')
+best_n_neighbors = 0
+
+for n_neighbors in neighbors_settings:
+    imputer = KNNImputer(n_neighbors=n_neighbors)
+    train_imputed = imputer.fit_transform(train)
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+    scores = cross_val_score(model, train_imputed, target, cv=5, scoring='neg_mean_squared_error')
+    mean_score = scores.mean()
+    print(mean_score)
+    if mean_score > best_score:
+        best_score = mean_score
+        best_n_neighbors = n_neighbors
+
+print(f"最佳的 n_neighbors 數量是: {best_n_neighbors}")
+
+# fill nan
+imputer = KNNImputer(n_neighbors=best_n_neighbors)
+train_imputed = imputer.fit_transform(train)
+test_imputed = imputer.transform(test)
+
+# convert to dataframe
+train = pd.DataFrame(train_imputed, columns=train.columns)
+test = pd.DataFrame(test_imputed, columns=test.columns)
 
