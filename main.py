@@ -1,4 +1,7 @@
 import pandas as pd
+import numpy as np
+from scipy import stats
+
 
 # Access data
 train = pd.read_csv("C:\\python自主學習\\House-Price-Prediction\\train.csv")
@@ -9,57 +12,27 @@ target = train['SalePrice']
 
 train = train.drop(columns = ['Id','SalePrice'])
 test = test.drop(columns = 'Id')
-
+        
 # Find missing value
 missing_train = train.isnull().sum()
 missing_test = test.isnull().sum()
 
-# Remove columns which over 50% missing values are in the column
-# df = df.loc[:, df.isnull().mean() < 0.5]
-train = train.drop(columns = ['Alley','FireplaceQu','Fence','MiscFeature','PoolQC'])
-test = test.drop(columns = ['Alley','FireplaceQu','Fence','MiscFeature','PoolQC'])
-
-# Scale the continuous variable before processing KNN
-import numpy as np
-from sklearn.preprocessing import StandardScaler
-
+#fill missing value by median in that numerical column
 numerical_columns_train = train.select_dtypes(include=['float64', 'int64']).columns
 numerical_columns_test = test.select_dtypes(include=['float64', 'int64']).columns
 
 for column in numerical_columns_train:
-    scaler = StandardScaler()
-    
-    # Save the mask of NaN values
-    train_nan_mask = train[column].isna()
-    test_nan_mask = test[column].isna()
-    
-    # Temporarily fill NaN with the mean
-    train_no_nan = train[column].fillna(train[column].mean()).values.reshape(-1, 1)
-    test_no_nan = test[column].fillna(test[column].mean()).values.reshape(-1, 1)
-    
-    # StandardScaler
-    train_scaled = scaler.fit_transform(train_no_nan).reshape(-1)
-    test_scaled = scaler.transform(test_no_nan).reshape(-1)
-    
-    # Assign the scaled values back to the DataFrame
-    train[column] = train_scaled
-    test[column] = test_scaled
-    
-    # Restore the NaN values with np.nan to maintain float type
-    train.loc[train_nan_mask, column] = np.nan
-    test.loc[test_nan_mask, column] = np.nan
+    train[column] = np.where(train[column].isnull(),np.nanmedian(train[column]),train[column])
+    test[column] = np.where(test[column].isnull(),np.nanmedian(test[column]),test[column])
 
-
-print(train.dtypes)
-
-# Find categorical column
+#fill missing value by mode in that categorical column
 categorical_columns_train = train.select_dtypes(include=['object']).columns
 categorical_columns_test = train.select_dtypes(include=['object']).columns
 
-# Fill nan in categorical columns by using 'missing' string
 for column in categorical_columns_train:
-    train[column].fillna('missing',inplace = True)
-    test[column].fillna('missing',inplace = True)
+    train[column] = np.where(train[column].isnull(),stats.mode(train[column])[0],train[column])
+    test[column] = np.where(test[column].isnull(),stats.mode(test[column])[0],test[column])
+
 
 # Label Encoding
 from sklearn.preprocessing import LabelEncoder
@@ -67,41 +40,27 @@ le = LabelEncoder()
 
 for column in categorical_columns_train:
     train[column] = le.fit_transform(train[column])
-    test[column] = le.fit_transform(test[column])
-    
+    test[column] = le.transform(test[column])
 
 print(train.dtypes)
 
-# KNN
-from sklearn.impute import KNNImputer
-from sklearn.model_selection import cross_val_score
-from sklearn.ensemble import RandomForestRegressor
 
-neighbors_settings = range(3, 10)
+#calculate the correlation coefficient of each column
+train['SalePrice'] = target
+correlation_matrix = train.corr()
+correlation_with_target = correlation_matrix['SalePrice'].abs().sort_values(ascending=False)
 
-# using cross validation to decide the number of n_neighbor
-best_score = float('-inf')
-best_n_neighbors = 0
+#select the column which correlation coefficient are greater than 0.5
+selected_features = correlation_with_target[correlation_with_target > 0.5].index
 
-for n_neighbors in neighbors_settings:
-    imputer = KNNImputer(n_neighbors=n_neighbors)
-    train_imputed = imputer.fit_transform(train)
-    model = RandomForestRegressor(n_estimators=100, random_state=42)
-    scores = cross_val_score(model, train_imputed, target, cv=5, scoring='neg_mean_squared_error')
-    mean_score = scores.mean()
-    print(mean_score)
-    if mean_score > best_score:
-        best_score = mean_score
-        best_n_neighbors = n_neighbors
+#drop the columns which correlation coefficient are less than 0.5
+for columns in train:
+    if columns not in selected_features:
+        train = train.drop(columns,axis = 1)
+        test = test.drop(columns,axis = 1)
 
-print(f"最佳的 n_neighbors 數量是: {best_n_neighbors}")
+train = train.drop(columns = ['SalePrice'])
 
-# fill nan
-imputer = KNNImputer(n_neighbors=best_n_neighbors)
-train_imputed = imputer.fit_transform(train)
-test_imputed = imputer.transform(test)
+#訓練模型?
 
-# convert to dataframe
-train = pd.DataFrame(train_imputed, columns=train.columns)
-test = pd.DataFrame(test_imputed, columns=test.columns)
-
+#
