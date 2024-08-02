@@ -1,10 +1,13 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy import stats
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error
+
+
 
 # Access data
 train = pd.read_csv("C:\\python自主學習\\House-Price-Prediction\\train.csv")
@@ -74,20 +77,19 @@ X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 best_n_estimators = 0
-best_RMSE = float('inf')
+best_RMSE = float('inf') #infinity number
 
 for i in range(100, 501, 50):
     # Train RandomForestRegressor
-    clf = RandomForestRegressor(n_estimators=i, random_state=0)
-    clf.fit(X_train_scaled, y_train)
+    clf = RandomForestRegressor(n_estimators=i, random_state=0) #Initialize the random forest model
+    clf.fit(X_train_scaled, y_train) #Train the model with training data
 
     # Evaluate model
-    train_score = clf.score(X_train_scaled, y_train)
-    test_pred = clf.predict(X_test_scaled)
-    test_score = mean_squared_error(y_test, test_pred, squared=False)
+    train_score = clf.score(X_train_scaled, y_train) #Calculate the R² score of the training set, which is the model's ability to explain variation on the training set.
+    test_pred = clf.predict(X_test_scaled) #Use the trained model to predict the test set
+    test_score = mean_squared_error(y_test, test_pred, squared=False) #RMSE
 
     print(f"n_estimators = {i}")
-    print(f"隨機森林訓練資料集正確率 = {train_score}") 
     print(f"隨機森林測試資料集RMSE = {test_score}")  #31060.5008
 
     # Update best_n_estimators and best_RMSE
@@ -101,6 +103,13 @@ final_clf.fit(X_train_scaled, y_train)
 #predict
 test_scaled = scaler.transform(test)
 final_test_pred = final_clf.predict(test_scaled)
+
+plt.figure(figsize=(14,6))
+plt.plot(final_test_pred,'r',label = 'random forest') 
+plt.plot(target,'b', label = 'target')
+plt.legend()
+plt.show()
+
 
 
 # Gradient Boosting Regressor
@@ -119,6 +128,15 @@ print(f"Best Gradient Boosting RMSE: {np.sqrt(-grid_search.best_score_)}") #3410
 
 # Train final Gradient Boosting model
 final_gbr_clf = grid_search.best_estimator_
+
+# Predict with Gradient Boosting
+final_gbr_test_pred = final_gbr_clf.predict(test_scaled)
+
+plt.figure(figsize=(14,6))
+plt.plot(final_gbr_test_pred,'r',label = 'gbr') 
+plt.plot(target,'b', label = 'target')
+plt.legend()
+plt.show()
 
 # Predict with Gradient Boosting
 final_gbr_test_pred = final_gbr_clf.predict(test_scaled)
